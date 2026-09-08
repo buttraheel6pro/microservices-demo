@@ -13,8 +13,7 @@ export class NotificationConsumerService implements OnModuleInit {
     private readonly notificationsService: NotificationsService,
   ) {}
 
-  async onModuleInit() {
-    await new Promise((r) => setTimeout(r, 2000));
+  onModuleInit() {
     this.startPolling();
   }
 

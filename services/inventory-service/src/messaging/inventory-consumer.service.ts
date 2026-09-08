@@ -18,8 +18,7 @@ export class InventoryConsumerService implements OnModuleInit {
     private readonly inventoryService: InventoryService,
   ) {}
 
-  async onModuleInit() {
-    await new Promise((r) => setTimeout(r, 2000));
+  onModuleInit() {
     this.startPolling();
   }
 

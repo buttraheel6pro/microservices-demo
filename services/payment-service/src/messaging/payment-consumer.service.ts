@@ -13,8 +13,7 @@ export class PaymentConsumerService implements OnModuleInit {
     private readonly paymentsService: PaymentsService,
   ) {}
 
-  async onModuleInit() {
-    await new Promise((r) => setTimeout(r, 2000));
+  onModuleInit() {
     this.startPolling();
   }
 
