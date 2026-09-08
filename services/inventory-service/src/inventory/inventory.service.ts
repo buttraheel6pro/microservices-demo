@@ -27,17 +27,44 @@ export class InventoryService {
       `Reserving ${quantity} units of ${productId} for order ${orderId}`,
     );
 
-    const inventory = await this.prisma.inventory.findUnique({
-      where: { productId },
-    });
-
-    if (!inventory) {
-      this.logger.error(`Product ${productId} not found in inventory`);
-      await this.publishInventoryFailed(orderId, productId, `Product ${productId} not found`);
+    if (quantity <= 0) {
+      await this.publishInventoryFailed(
+        orderId,
+        productId,
+        `Invalid quantity: ${quantity}`,
+      );
       return;
     }
 
-    if (inventory.availableStock < quantity) {
+    // Atomically reserve stock only when enough inventory is available.
+    // This prevents two concurrent consumers from both passing a read check
+    // and over-reserving the same stock.
+    const result = await this.prisma.inventory.updateMany({
+      where: {
+        productId,
+        availableStock: { gte: quantity },
+      },
+      data: {
+        availableStock: { decrement: quantity },
+        reservedStock: { increment: quantity },
+      },
+    });
+
+    if (result.count === 0) {
+      const inventory = await this.prisma.inventory.findUnique({
+        where: { productId },
+      });
+
+      if (!inventory) {
+        this.logger.error(`Product ${productId} not found in inventory`);
+        await this.publishInventoryFailed(
+          orderId,
+          productId,
+          `Product ${productId} not found`,
+        );
+        return;
+      }
+
       this.logger.warn(
         `Insufficient stock for ${productId}: available=${inventory.availableStock}, requested=${quantity}`,
       );
@@ -48,14 +75,6 @@ export class InventoryService {
       );
       return;
     }
-
-    await this.prisma.inventory.update({
-      where: { productId },
-      data: {
-        availableStock: { decrement: quantity },
-        reservedStock: { increment: quantity },
-      },
-    });
 
     this.logger.log(
       `[SAGA] Stock reserved for order ${orderId}: ${quantity} units of ${productId}`,
